@@ -3,10 +3,19 @@
 import { ArrowLeft, ArrowRight, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 import { useToast } from "@/components/Toast";
 import { clientGql } from "@/lib/clientGraphql";
+import { draftKey, getDraft, setDraft } from "@/lib/commentDrafts";
+import {
+  isTypingTarget,
+  queueKeyAction,
+  type QueueKeyAction,
+} from "@/lib/queueKeys";
+import { composeLibraryComment } from "@timetable/shared";
+
+import { useCommentsOpen } from "./CommentsOpenScope";
 
 const HEART = `mutation QueueHeart($id: String!) {
   heartTopic(topicId: $id) { hearted }
@@ -20,9 +29,91 @@ const NEXT = `mutation QueueNext($id: String!) {
   queueMarkSeen(topicId: $id)
 }`;
 
+const LIBRARY = `query LibraryMatches($s: String!, $id: String!) {
+  libraryMatches(idOrSlug: $s, topicId: $id) { name url }
+}`;
+
 function switchLabel(hearted: boolean, hostMode: boolean): string {
   const glyph = hostMode ? "💙" : "❤️";
   return hearted ? `${glyph}'d — click to remove` : `${glyph} this topic`;
+}
+
+/** ↓ puts the caret in this topic's public composer. The box may not be
+ * in the DOM yet: `requestOpen` can be switching the topic-tabs strip back
+ * to Comments (followCommentsOpen), and that pane renders a frame later —
+ * hence the bounded retry rather than one look. */
+function focusComposer(topicId: string, attempt = 0) {
+  const box = document.querySelector<HTMLTextAreaElement>(
+    `[data-topic-composer="${topicId}"]`,
+  );
+  if (box) {
+    box.focus();
+    box.scrollIntoView({ block: "center", behavior: "smooth" });
+    return;
+  }
+  if (attempt < 3) {
+    requestAnimationFrame(() => focusComposer(topicId, attempt + 1));
+  }
+}
+
+/**
+ * in-the-library (2026-09-07): ↓ also asks the Civic Tech Field Guide's
+ * matcher what this topic is about, and pre-composes the answer as a
+ * comment for the box it just opened — heading, one line of lead, then up
+ * to three library entries with their links, ranked by the matcher.
+ *
+ * A pre-filled box is a destructive thing to hand someone, so this only
+ * ever writes into an EMPTY draft: empty when ↓ was pressed, and still
+ * empty when the matcher answers a second or two later (by which point you
+ * may have started typing your own comment, and that wins). A miss, a
+ * failure, or an unconfigured matcher leaves the box as it was, which is
+ * how ↓ behaves for everyone who is just there to comment.
+ */
+async function suggestLibraryComment(slug: string, topicId: string) {
+  const key = draftKey.comment(topicId, "public");
+  if (getDraft(key)) return;
+  try {
+    const data = await clientGql<{
+      libraryMatches: { name: string; url: string }[] | null;
+    }>(LIBRARY, { s: slug, id: topicId });
+    const body = composeLibraryComment(data.libraryMatches ?? []);
+    if (!body || getDraft(key)) return;
+    setDraft(key, body);
+  } catch {
+    // The library is a nicety on top of commenting; an empty box is the
+    // fallback, and a toast here would interrupt the round.
+  }
+}
+
+/** The arrow legend under the bar (queue-keys, 2026-09-07). The buttons
+ * carry the same shortcuts in `aria-keyshortcuts`, so this is the sighted
+ * reader's copy of what assistive tech is already told — aria-hidden
+ * keeps it from being read twice. */
+function QueueKeyHints({
+  canHeart,
+  back,
+}: {
+  canHeart: boolean;
+  back: number;
+}) {
+  return (
+    <p className="faint queue-keys" aria-hidden>
+      <span>
+        <kbd>←</kbd> back
+      </span>
+      {canHeart ? (
+        <span>
+          <kbd>↑</kbd> ❤️
+        </span>
+      ) : null}
+      <span>
+        <kbd>↓</kbd> comment
+      </span>
+      <span>
+        <kbd>→</kbd> {back > 0 ? "forward" : "next"}
+      </span>
+    </p>
+  );
 }
 
 /** queue-back's left arrow: a link, because the step lives in the URL.
@@ -36,6 +127,7 @@ function BackStep({ href }: { href: string | null }) {
         className="queue-btn queue-btn-back"
         aria-label="Previous topic"
         title="Nothing to go back to yet"
+        aria-keyshortcuts="ArrowLeft"
         disabled
       >
         <ArrowLeft size={24} aria-hidden />
@@ -47,7 +139,8 @@ function BackStep({ href }: { href: string | null }) {
       className="queue-btn queue-btn-back"
       href={href}
       aria-label="Previous topic"
-      title="Previous topic"
+      title="Previous topic (←)"
+      aria-keyshortcuts="ArrowLeft"
     >
       <ArrowLeft size={24} aria-hidden />
     </Link>
@@ -62,7 +155,8 @@ function ForwardStep({ href, label }: { href: string; label: string }) {
       className="queue-btn queue-btn-next"
       href={href}
       aria-label={label}
-      title={label}
+      title={`${label} (→)`}
+      aria-keyshortcuts="ArrowRight"
     >
       <ArrowRight size={30} aria-hidden />
     </Link>
@@ -90,7 +184,8 @@ function HeartSwitch({
       role="switch"
       aria-checked={hearted}
       aria-label={label}
-      title={label}
+      title={`${label} (↑)`}
+      aria-keyshortcuts="ArrowUp"
       disabled={busy}
       onClick={onToggle}
     >
@@ -137,6 +232,8 @@ export function QueueControls({
 }) {
   const router = useRouter();
   const { toastError } = useToast();
+  // ↓ unfolds the comment-teaser the same way the 💬 button does.
+  const { requestOpen } = useCommentsOpen();
   const [inFlight, setInFlight] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [hearted, setHearted] = useState(initialHearted);
@@ -189,35 +286,93 @@ export function QueueControls({
     n <= 0 ? `/f/${slug}/queue` : `/f/${slug}/queue?back=${n}`;
   const canGoBack = back < historyCount;
 
+  /** ↓: open this card's discussion and put the caret in the composer.
+   * Enter there posts (CommentComposer's `submitOnEnter`), Escape hands
+   * the arrows back to the queue. */
+  function openComposer() {
+    requestOpen();
+    focusComposer(topicId);
+    // in-the-library: one lookup per topic, however many times ↓ is
+    // pressed. The ref survives router.refresh() reconciling this
+    // component in place, so it is keyed by topic rather than a boolean.
+    if (suggestedFor.current !== topicId) {
+      suggestedFor.current = topicId;
+      void suggestLibraryComment(slug, topicId);
+    }
+  }
+
+  // queue-keys (2026-09-07): a round is worked through from the keyboard —
+  // the four arrows are the four buttons on this bar. Held in a ref so the
+  // listener binds once per mount and still runs against the CURRENT
+  // topic: router.refresh() reconciles this component in place (see the
+  // note above), so a listener that closed over `topicId` would keep
+  // hearting the topic you had two cards ago.
+  /** in-the-library: the topic whose library lookup has already been made
+   * this mount. */
+  const suggestedFor = useRef<string | null>(null);
+  const runAction = useRef<(action: QueueKeyAction) => void>(() => {});
+  useEffect(() => {
+    runAction.current = (action) => {
+      if (action === "back") {
+        if (canGoBack) router.push(stepHref(back + 1));
+      } else if (action === "next") {
+        if (busy) return;
+        if (back > 0) router.push(stepHref(back - 1));
+        else void next();
+      } else if (action === "heart") {
+        if (canHeart && !busy) void toggleHeart();
+      } else {
+        openComposer();
+      }
+    };
+  });
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (isTypingTarget(e.target as HTMLElement | null)) return;
+      const action = queueKeyAction(e);
+      if (!action) return;
+      // ↑/↓ would otherwise scroll the page under the card.
+      e.preventDefault();
+      runAction.current(action);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   return (
-    <div className="queue-bar">
-      <BackStep href={canGoBack ? stepHref(back + 1) : null} />
-      {canHeart ? (
-        <HeartSwitch
-          hearted={hearted}
-          hostMode={hostMode}
-          busy={busy}
-          onToggle={toggleHeart}
-        />
-      ) : null}
-      {back > 0 ? (
-        <ForwardStep
-          href={stepHref(back - 1)}
-          label={back === 1 ? "Back to where you were" : "Forward"}
-        />
-      ) : (
-        <button
-          type="button"
-          className="queue-btn queue-btn-next"
-          aria-label="Next topic"
-          title="Next topic"
-          disabled={busy}
-          onClick={next}
-        >
-          <ArrowRight size={30} aria-hidden />
-        </button>
-      )}
-    </div>
+    <>
+      <div className="queue-bar">
+        <BackStep href={canGoBack ? stepHref(back + 1) : null} />
+        {canHeart ? (
+          <HeartSwitch
+            hearted={hearted}
+            hostMode={hostMode}
+            busy={busy}
+            onToggle={toggleHeart}
+          />
+        ) : null}
+        {back > 0 ? (
+          <ForwardStep
+            href={stepHref(back - 1)}
+            label={back === 1 ? "Back to where you were" : "Forward"}
+          />
+        ) : (
+          <button
+            type="button"
+            className="queue-btn queue-btn-next"
+            aria-label="Next topic"
+            title="Next topic (→)"
+            aria-keyshortcuts="ArrowRight"
+            disabled={busy}
+            onClick={next}
+          >
+            <ArrowRight size={30} aria-hidden />
+          </button>
+        )}
+      </div>
+      <QueueKeyHints canHeart={canHeart} back={back} />
+    </>
   );
 }
 

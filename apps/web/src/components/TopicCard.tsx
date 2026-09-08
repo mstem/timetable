@@ -178,6 +178,7 @@ function CommentSection({
   viewerId,
   roleLabels,
   topicHref,
+  submitOnEnter,
 }: {
   topic: FeedTopic;
   perms: FeedPerms;
@@ -187,6 +188,8 @@ function CommentSection({
   viewerId: string | null;
   roleLabels: RoleLabels;
   topicHref?: string | null;
+  /** queue-keys: the Topic Queue's ↓ lands here, and Enter posts. */
+  submitOnEnter: boolean;
 }) {
   if (!perms.canComment && publicComments.length === 0) return null;
   const thread = (
@@ -205,7 +208,14 @@ function CommentSection({
   return (
     <div className="comment-section">
       {perms.canComment ? (
-        <CommentComposer topicId={topic.id} mentionSlug={slug} />
+        <CommentComposer
+          topicId={topic.id}
+          mentionSlug={slug}
+          submitOnEnter={submitOnEnter}
+          placeholder={
+            submitOnEnter ? "Add a comment… (Enter posts)" : undefined
+          }
+        />
       ) : null}
       {open ? (
         thread
@@ -252,6 +262,8 @@ type TabArgs = {
   actionsRow: React.ReactNode;
   /** Topic permalink — the comment timestamps' link target (#259). */
   permalink: string | null;
+  /** Queue mode: the public composer takes Enter as Post (queue-keys). */
+  submitOnEnter: boolean;
 };
 
 /** Unconditional: it carries the ❤️ row, so every card has it. */
@@ -274,6 +286,7 @@ function commentsTab(a: TabArgs): TopicTab {
           viewerId={a.viewerId}
           roleLabels={a.roleLabels}
           topicHref={a.permalink}
+          submitOnEnter={a.submitOnEnter}
         />
       </>
     ),
@@ -536,6 +549,9 @@ export function TopicCard({
               hostCommentsEnabled,
               calendar,
               permalink,
+              // queue-keys: ↓ opens this composer and Enter posts, but
+              // only on the queue — the surface where the keyboard drives.
+              submitOnEnter: queueControls != null,
               actionsRow: queueControls ? null : (
                 <FeedActionsRow
                   topic={topic}

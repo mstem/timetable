@@ -2462,6 +2462,29 @@ a.c-time:hover {
 a.queue-btn-back:hover {
   color: var(--ink);
 }
+/* queue-keys (2026-09-07): the arrow legend under the decision bar. The
+   keys are the fast path through a round and the buttons alone don't say
+   so. Sits inside the card, above the topic-tabs strip. */
+.queue-keys {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 14px;
+  margin: 0 0 2px;
+  font-size: var(--text-xs);
+}
+.queue-keys kbd {
+  display: inline-block;
+  min-width: 18px;
+  padding: 1px 4px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-xs);
+  background: var(--wash);
+  color: var(--muted);
+  font: inherit;
+  text-align: center;
+}
+
 .queue-progress {
   text-align: center;
   font-size: var(--text-sm);
