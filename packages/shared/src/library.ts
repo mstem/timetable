@@ -24,7 +24,7 @@ export type LibraryMatch = {
 export const LIBRARY_MATCH_LIMIT = 3;
 
 /** The endpoint's documented input cap. */
-const QUERY_TEXT_MAX = 5000;
+export const LIBRARY_TEXT_MAX = 5000;
 
 /**
  * Relevance order, and it is the matcher's rather than ours: within each
@@ -47,7 +47,7 @@ export function libraryQueryText(topic: {
   title: string;
   body: string;
 }): string {
-  return `${topic.title}\n\n${topic.body}`.trim().slice(0, QUERY_TEXT_MAX);
+  return `${topic.title}\n\n${topic.body}`.trim().slice(0, LIBRARY_TEXT_MAX);
 }
 
 /**

@@ -4,6 +4,7 @@ import { Send } from "lucide-react";
 import { useState } from "react";
 
 import { ComposerRow } from "@/components/ComposerRow";
+import { useToast } from "@/components/Toast";
 import { GrowingTextarea } from "@/components/GrowingTextarea";
 import {
   MentionTextarea,
@@ -11,6 +12,8 @@ import {
 } from "@/components/MentionTextarea";
 import { clientGql } from "@/lib/clientGraphql";
 import { draftKey, useDraft } from "@/lib/commentDrafts";
+import { holdComment } from "@/lib/pendingComments";
+import { GqlError } from "@/lib/transport";
 import { useGqlAction } from "@/lib/useGqlAction";
 
 import { useCommentsOpen } from "./CommentsOpenScope";
@@ -91,6 +94,7 @@ export function CommentComposer({
   submitOnEnter?: boolean;
 }) {
   const { run, busy } = useGqlAction();
+  const { toast } = useToast();
   // Posting unfolds the card's comment-teaser so the new comment is
   // visible in its thread (QA 2026-08-13); no-op without a teaser.
   const { requestOpen } = useCommentsOpen();
@@ -122,6 +126,32 @@ export function CommentComposer({
         : null;
   const copy = composerCopy(scopeLabel, { placeholder, successMessage });
 
+  /** held-comments (2026-09-11): the API counts writes from a personal
+   * token (20 an hour), and the comment it refuses is one somebody just
+   * finished editing. So a RATE_LIMITED refusal keeps the text and sends it
+   * when the window reopens, rather than putting it in an error toast.
+   * Every other failure behaves as before: the box keeps its content and
+   * the person decides. */
+  function holdOnRateLimit(err: unknown): boolean {
+    if (!(err instanceof GqlError) || err.code !== "RATE_LIMITED") return false;
+    const held = holdComment({
+      topicId,
+      visibility,
+      body: body.trim(),
+      retryAfterSeconds: err.retryAfterSeconds,
+    });
+    clearBody();
+    toast(
+      `Comment held — the hourly limit is reached. It will send at ${new Date(
+        held.retryAt,
+      ).toLocaleTimeString(undefined, {
+        hour: "2-digit",
+        minute: "2-digit",
+      })}.`,
+    );
+    return true;
+  }
+
   function post() {
     const text = body.trim();
     if (!text) return;
@@ -131,6 +161,7 @@ export function CommentComposer({
       {
         success: copy.success,
         errorFallback: "Could not post comment",
+        onError: holdOnRateLimit,
         onSuccess: () => {
           clearBody();
           requestOpen();

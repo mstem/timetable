@@ -16,6 +16,11 @@ export type GqlActionOptions<T> = {
    * flags, follow-up requests). Runs inside the try, before the success
    * toast — a throw here lands in the same error toast as the mutation. */
   onSuccess?: (data: T) => void | Promise<void>;
+  /** Take the failure instead of toasting it. Return true when the caller
+   * has dealt with it and said so in its own words — held-comments does
+   * this for a RATE_LIMITED refusal, which is not an error the person needs
+   * to act on. Return false (or omit) for the ordinary error toast. */
+  onError?: (err: unknown) => boolean;
   /** Set false for flows that don't re-render server data, or decide from
    * the mutation result — a save that MOVED the page (topic rename → new
    * permalink) navigates instead, and a refresh of the old URL would 404.
@@ -65,7 +70,9 @@ export function useGqlAction() {
         startTransition(() => router.refresh());
       }
     } catch (err) {
-      toastError(err instanceof Error ? err.message : opts.errorFallback);
+      if (!opts.onError?.(err)) {
+        toastError(err instanceof Error ? err.message : opts.errorFallback);
+      }
     } finally {
       inFlightRef.current = false;
       setInFlight(false);

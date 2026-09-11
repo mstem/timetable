@@ -202,7 +202,7 @@ describe("queue-keys", () => {
     await waitFor(() =>
       expect(mocks.localGql).toHaveBeenCalledWith(
         expect.stringContaining("libraryMatches"),
-        { s: "spt", id: "t1" },
+        { s: "spt", id: "t1", text: null },
       ),
     );
     expect(getDraft(PUBLIC_DRAFT)).toBe("");
@@ -231,6 +231,19 @@ describe("queue-keys", () => {
     box.value = "half a thought";
     fireEvent.keyDown(box, { key: "ArrowDown" });
     expect(mocks.localGql).not.toHaveBeenCalled();
+  });
+
+  it("sends the topic's own words when the card has them", async () => {
+    mocks.localGql.mockResolvedValue({ libraryMatches: MATCHES });
+    setup({ topicText: "Separatist Utopias\n\nHow collectives form." });
+    fireEvent.keyDown(window, { key: "ArrowDown" });
+    await waitFor(() =>
+      expect(mocks.localGql).toHaveBeenCalledWith(expect.any(String), {
+        s: "spt",
+        id: "t1",
+        text: "Separatist Utopias\n\nHow collectives form.",
+      }),
+    );
   });
 
   it("drops the ❤️ hint from the legend without the gesture", () => {

@@ -145,6 +145,7 @@ export default async function QueuePage({
                 slug={slug}
                 back={back}
                 historyCount={queue.historyCount}
+                topicText={`${queue.current.title}\n\n${queue.current.bodyMd}`}
               />
             }
           />

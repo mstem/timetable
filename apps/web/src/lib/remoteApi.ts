@@ -29,8 +29,17 @@
  */
 import "server-only";
 
-const url = (process.env.DEV_API_URL ?? "").trim().replace(/\/+$/, "");
-const token = (process.env.DEV_API_TOKEN ?? "").trim();
+// REMOTE_API_* is the current spelling; DEV_API_* still works, and was the
+// only spelling until this could point at production, where a variable named
+// DEV_ is a misreading waiting to happen (2026-09-11).
+const url = (process.env.REMOTE_API_URL ?? process.env.DEV_API_URL ?? "")
+  .trim()
+  .replace(/\/+$/, "");
+const token = (
+  process.env.REMOTE_API_TOKEN ??
+  process.env.DEV_API_TOKEN ??
+  ""
+).trim();
 
 /** Both halves or neither — a URL with no token would silently downgrade
  * every write to an anonymous 401, which reads as "commenting is broken". */

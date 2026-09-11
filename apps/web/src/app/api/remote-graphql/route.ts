@@ -8,7 +8,7 @@
  * browser call to dev.timetable.love would fail both checks.
  *
  * Local-only by construction: `lib/remoteApi.ts` returns null unless both
- * DEV_API_URL and DEV_API_TOKEN are set, and `NEXT_PUBLIC_REMOTE_API` (the
+ * REMOTE_API_URL and REMOTE_API_TOKEN are set, and `NEXT_PUBLIC_REMOTE_API` (the
  * flag that makes the browser use this route) refuses to exist in a
  * production build.
  */
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
         errors: [
           {
             message:
-              "Remote dev API not configured — set DEV_API_URL and DEV_API_TOKEN in apps/web/.env.local",
+              "Remote dev API not configured — set REMOTE_API_URL and REMOTE_API_TOKEN in apps/web/.env.local",
           },
         ],
       },

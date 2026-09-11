@@ -3,6 +3,7 @@ import { Suspense } from "react";
 
 import { AccountMenu } from "@/components/AccountMenu";
 import { DigestReadMarker } from "@/components/DigestReadMarker";
+import { HeldComments } from "@/components/HeldComments";
 import { TopbarBrand, type BrandItem } from "@/components/TopbarBrand";
 import { TopbarHamburger } from "@/components/TopbarHamburger";
 import { TopbarHeightSync } from "@/components/TopbarHeightSync";
@@ -46,6 +47,9 @@ export default async function AppLayout({
           <DigestReadMarker />
         </Suspense>
       ) : null}
+      {/* held-comments: sends anything the API's write limit turned away,
+          once its window has reopened. Renders nothing. */}
+      {userId ? <HeldComments /> : null}
       <header className="topbar">
         <TopbarHeightSync />
         <TopbarHamburger />

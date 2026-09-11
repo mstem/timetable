@@ -29,8 +29,33 @@ export type Transport = {
 
 type GraphQLEnvelope<T> = {
   data?: T;
-  errors?: { message: string }[];
+  errors?: {
+    message: string;
+    extensions?: { code?: string; retryAfterSeconds?: number };
+  }[];
 };
+
+/**
+ * A GraphQL error with the server's own `extensions` kept (2026-09-11).
+ * Callers used to get a bare Error carrying only the message, so the one
+ * piece of machine-readable detail the API sends — `RATE_LIMITED` and how
+ * many seconds until the window reopens — was thrown away at the seam and
+ * could only be recovered by matching on English.
+ */
+export class GqlError extends Error {
+  readonly code: string | null;
+  readonly retryAfterSeconds: number | null;
+
+  constructor(
+    message: string,
+    extensions?: { code?: string; retryAfterSeconds?: number },
+  ) {
+    super(message);
+    this.name = "GqlError";
+    this.code = extensions?.code ?? null;
+    this.retryAfterSeconds = extensions?.retryAfterSeconds ?? null;
+  }
+}
 
 export function createTransport(auth: TransportAuth): Transport {
   async function authHeaders(
@@ -71,7 +96,8 @@ export function createTransport(auth: TransportAuth): Transport {
       json = undefined;
     }
     if (json?.errors?.length) {
-      throw new Error(json.errors[0]?.message ?? "GraphQL error");
+      const first = json.errors[0];
+      throw new GqlError(first?.message ?? "GraphQL error", first?.extensions);
     }
     if (!res.ok) {
       throw new Error(`GraphQL request failed: ${res.status}`);

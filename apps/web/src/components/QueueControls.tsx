@@ -31,8 +31,8 @@ const NEXT = `mutation QueueNext($id: String!) {
   queueMarkSeen(topicId: $id)
 }`;
 
-const LIBRARY = `query LibraryMatches($s: String!, $id: String!) {
-  libraryMatches(idOrSlug: $s, topicId: $id) { name url }
+const LIBRARY = `query LibraryMatches($s: String!, $id: String!, $text: String) {
+  libraryMatches(idOrSlug: $s, topicId: $id, text: $text) { name url }
 }`;
 
 function switchLabel(hearted: boolean, hostMode: boolean): string {
@@ -71,7 +71,11 @@ function focusComposer(topicId: string, attempt = 0) {
  * failure, or an unconfigured matcher leaves the box as it was, which is
  * how ↓ behaves for everyone who is just there to comment.
  */
-async function suggestLibraryComment(slug: string, topicId: string) {
+async function suggestLibraryComment(
+  slug: string,
+  topicId: string,
+  text: string | null,
+) {
   const key = draftKey.comment(topicId, "public");
   if (getDraft(key)) return;
   try {
@@ -80,7 +84,7 @@ async function suggestLibraryComment(slug: string, topicId: string) {
     // hosted schema for a field it doesn't have.
     const data = await localGql<{
       libraryMatches: { name: string; url: string }[] | null;
-    }>(LIBRARY, { s: slug, id: topicId });
+    }>(LIBRARY, { s: slug, id: topicId, text });
     const body = composeLibraryComment(data.libraryMatches ?? []);
     if (!body || getDraft(key)) return;
     setDraft(key, body);
@@ -226,6 +230,7 @@ export function QueueControls({
   slug,
   back = 0,
   historyCount = 0,
+  topicText,
 }: {
   topicId: string;
   hearted: boolean;
@@ -238,6 +243,10 @@ export function QueueControls({
   back?: number;
   /** How many reviewed topics are available to step back through. */
   historyCount?: number;
+  /** in-the-library: the topic's own words, sent with the lookup so the
+   * LOCAL matcher can answer about a topic it does not have — which is
+   * every topic once remote-dev-api points the app at a real forum. */
+  topicText?: string;
 }) {
   const router = useRouter();
   const { toastError } = useToast();
@@ -307,7 +316,7 @@ export function QueueControls({
     // Repeats are free: the empty-draft guard stops it overwriting you,
     // and the API caches a topic's matches for 24h, so a second press
     // spends nothing from the matcher's shared daily budget.
-    void suggestLibraryComment(slug, topicId);
+    void suggestLibraryComment(slug, topicId, topicText ?? null);
   }
 
   // queue-keys (2026-09-07): a round is worked through from the keyboard —
