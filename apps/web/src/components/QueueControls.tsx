@@ -10,6 +10,7 @@ import { clientGql } from "@/lib/clientGraphql";
 import { draftKey, getDraft, setDraft } from "@/lib/commentDrafts";
 import { localGql } from "@/lib/localGraphql";
 import {
+  isEmptyTopicComposer,
   isTypingTarget,
   queueKeyAction,
   type QueueKeyAction,
@@ -334,9 +335,17 @@ export function QueueControls({
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (isTypingTarget(e.target as HTMLElement | null)) return;
       const action = queueKeyAction(e);
       if (!action) return;
+      const target = e.target as HTMLTextAreaElement | null;
+      // Typing wins, with one exception: ↓ in an empty composer, which has
+      // no caret to move and is exactly where the suggestion goes.
+      if (
+        isTypingTarget(target) &&
+        !(action === "comment" && isEmptyTopicComposer(target))
+      ) {
+        return;
+      }
       // ↑/↓ would otherwise scroll the page under the card.
       e.preventDefault();
       runAction.current(action);

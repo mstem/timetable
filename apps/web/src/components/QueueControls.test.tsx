@@ -208,6 +208,31 @@ describe("queue-keys", () => {
     expect(getDraft(PUBLIC_DRAFT)).toBe("");
   });
 
+  /** The reported break (2026-09-11): ↓ focuses the composer, so a second ↓
+   * arrived with the composer as the event target and used to be handed
+   * straight to it. */
+  it("↓ works again with the caret already in an empty composer", async () => {
+    mocks.localGql.mockResolvedValue({ libraryMatches: MATCHES });
+    setup();
+    const box = screen.getByLabelText("Comment") as HTMLTextAreaElement;
+    fireEvent.keyDown(window, { key: "ArrowDown" });
+    await waitFor(() => expect(getDraft(PUBLIC_DRAFT)).not.toBe(""));
+
+    clearDraft(PUBLIC_DRAFT);
+    box.value = "";
+    mocks.localGql.mockClear();
+    fireEvent.keyDown(box, { key: "ArrowDown" });
+    await waitFor(() => expect(mocks.localGql).toHaveBeenCalled());
+  });
+
+  it("↓ in a composer with text in it still belongs to the composer", () => {
+    setup();
+    const box = screen.getByLabelText("Comment") as HTMLTextAreaElement;
+    box.value = "half a thought";
+    fireEvent.keyDown(box, { key: "ArrowDown" });
+    expect(mocks.localGql).not.toHaveBeenCalled();
+  });
+
   it("drops the ❤️ hint from the legend without the gesture", () => {
     const { container } = setup({ canHeart: false });
     expect(container.textContent).toContain("comment");

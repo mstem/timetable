@@ -28,6 +28,29 @@ export function queueKeyAction(event: {
   return KEY_ACTIONS[event.key] ?? null;
 }
 
+/**
+ * ↓ pressed inside an EMPTY topic composer still belongs to the queue.
+ *
+ * There is no caret work for it to do in an empty box, and the box it
+ * would fill is the one under the cursor. Without this the FIRST ↓ focuses
+ * the composer and every ↓ after it is swallowed by `isTypingTarget`, so
+ * the library suggestion can never be asked for a second time without
+ * clicking away first (2026-09-11). The queue shows one card, so matching
+ * any `data-topic-composer` is enough and avoids a stale topic id in the
+ * window listener.
+ */
+export function isEmptyTopicComposer(
+  target:
+    | { value?: string; dataset?: { topicComposer?: string } }
+    | null
+    | undefined,
+): boolean {
+  if (!target?.dataset || target.dataset.topicComposer === undefined) {
+    return false;
+  }
+  return (target.value ?? "").trim() === "";
+}
+
 /** True while the keystroke belongs to something being typed in — above
  * all the composer that ↓ just opened, where ↓ moves the caret and Enter
  * posts (CommentComposer's `submitOnEnter`). */

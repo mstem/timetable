@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { isTypingTarget, queueKeyAction } from "@/lib/queueKeys";
+import {
+  isEmptyTopicComposer,
+  isTypingTarget,
+  queueKeyAction,
+} from "@/lib/queueKeys";
 
 /** The Topic Queue's arrow mapping. The cases that matter are the ones
  * where the queue must NOT act: a modifier belongs to the browser, and a
@@ -39,5 +43,27 @@ describe("queue-keys", () => {
     expect(isTypingTarget({ tagName: "BODY" })).toBe(false);
     expect(isTypingTarget({ tagName: "BUTTON" })).toBe(false);
     expect(isTypingTarget(null)).toBe(false);
+  });
+});
+
+describe("isEmptyTopicComposer", () => {
+  const composer = (value: string) => ({
+    value,
+    dataset: { topicComposer: "t1" },
+  });
+
+  it("is true for the topic composer with nothing in it", () => {
+    expect(isEmptyTopicComposer(composer(""))).toBe(true);
+    expect(isEmptyTopicComposer(composer("   \n "))).toBe(true);
+  });
+
+  it("is false once something is typed — that box owns its own arrows", () => {
+    expect(isEmptyTopicComposer(composer("half a thought"))).toBe(false);
+  });
+
+  it("is false for any other field", () => {
+    expect(isEmptyTopicComposer({ value: "", dataset: {} })).toBe(false);
+    expect(isEmptyTopicComposer(null)).toBe(false);
+    expect(isEmptyTopicComposer(undefined)).toBe(false);
   });
 });
