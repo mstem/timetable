@@ -300,13 +300,13 @@ export function QueueControls({
   function openComposer() {
     requestOpen();
     focusComposer(topicId);
-    // in-the-library: one lookup per topic, however many times ↓ is
-    // pressed. The ref survives router.refresh() reconciling this
-    // component in place, so it is keyed by topic rather than a boolean.
-    if (suggestedFor.current !== topicId) {
-      suggestedFor.current = topicId;
-      void suggestLibraryComment(slug, topicId);
-    }
+    // in-the-library: ↓ asks every time. It used to ask once per topic per
+    // mount, which made a second press look broken — clear the box to
+    // write your own comment, change your mind, press ↓ again, nothing.
+    // Repeats are free: the empty-draft guard stops it overwriting you,
+    // and the API caches a topic's matches for 24h, so a second press
+    // spends nothing from the matcher's shared daily budget.
+    void suggestLibraryComment(slug, topicId);
   }
 
   // queue-keys (2026-09-07): a round is worked through from the keyboard —
@@ -315,9 +315,6 @@ export function QueueControls({
   // topic: router.refresh() reconciles this component in place (see the
   // note above), so a listener that closed over `topicId` would keep
   // hearting the topic you had two cards ago.
-  /** in-the-library: the topic whose library lookup has already been made
-   * this mount. */
-  const suggestedFor = useRef<string | null>(null);
   const runAction = useRef<(action: QueueKeyAction) => void>(() => {});
   useEffect(() => {
     runAction.current = (action) => {
