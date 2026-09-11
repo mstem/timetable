@@ -80,12 +80,45 @@ function displayName(name: string, kind: LibraryMatchKind): string {
     .join(" ");
 }
 
+/**
+ * Record ids the matcher returns that are not real entries. Seeded with the
+ * "Community" record (Matt, 2026-09-11), which is the top of the communities
+ * taxonomy rather than a community anyone can go and join. Add ids here as
+ * they turn up; the structural test below catches the common shape without
+ * needing a list.
+ */
+const BLOCKED_RECORD_IDS = new Set(["recs9xea7ulk8NQRV"]);
+
+/** The Airtable record id out of a softrUrl, or "". */
+function recordId(url: string): string {
+  return /[?&]recordId=([A-Za-z0-9]+)/.exec(url)?.[1] ?? "";
+}
+
+/**
+ * A top-level taxonomy entry rather than something to explore: the
+ * communities table's own "Community" row, and its siblings in the other
+ * tables. Recommending one is like answering "what is this about?" with the
+ * name of the filing cabinet.
+ *
+ * The test is structural on purpose — an entry named after its own kind is
+ * the category, not a member of it — so "Categories" and "Issues" are caught
+ * without anybody maintaining a list.
+ */
+function isTaxonomyRoot(name: string, kind: LibraryMatchKind): boolean {
+  const n = name.trim().toLowerCase();
+  const plural = kind.endsWith("y") ? `${kind.slice(0, -1)}ies` : `${kind}s`;
+  return n === kind || n === plural;
+}
+
 function readMatch(raw: unknown, kind: LibraryMatchKind): LibraryMatch | null {
   if (typeof raw !== "object" || raw === null) return null;
   const entry = raw as Record<string, unknown>;
   const name = typeof entry.name === "string" ? entry.name.trim() : "";
   const url = httpUrl(entry.softrUrl);
   if (!name || !url) return null;
+  if (isTaxonomyRoot(name, kind) || BLOCKED_RECORD_IDS.has(recordId(url))) {
+    return null;
+  }
   const description =
     typeof entry.description === "string" && entry.description.trim()
       ? entry.description.trim()

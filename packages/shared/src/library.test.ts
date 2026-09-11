@@ -124,3 +124,55 @@ describe("composeLibraryComment", () => {
     expect(composeLibraryComment([])).toBe("");
   });
 });
+
+describe("taxonomy roots", () => {
+  /** The communities table's own "Community" record (Matt, 2026-09-11):
+   * shaped like any other result, but it is the filing cabinet. */
+  it("drops an entry named after its own kind", () => {
+    const matches = parseLibraryMatches({
+      communities: [
+        {
+          name: "community",
+          softrUrl:
+            "https://ctfg.softr.app/community?recordId=recs9xea7ulk8NQRV",
+        },
+        { name: "code for all", softrUrl: "https://ctfg.softr.app/c?r=1" },
+      ],
+    });
+    expect(matches.map((m) => m.name)).toEqual(["Code For All"]);
+  });
+
+  it("drops the plural forms too, in every table", () => {
+    const matches = parseLibraryMatches({
+      categories: [{ name: "Categories", softrUrl: "https://x.test/a" }],
+      issues: [{ name: "Issues", softrUrl: "https://x.test/b" }],
+      communities: [{ name: "Communities", softrUrl: "https://x.test/c" }],
+    });
+    expect(matches).toEqual([]);
+  });
+
+  it("drops a blocked record id whatever it calls itself", () => {
+    const matches = parseLibraryMatches({
+      categories: [
+        {
+          name: "Something Else Entirely",
+          softrUrl: "https://app.civictech.guide/x?recordId=recs9xea7ulk8NQRV",
+        },
+      ],
+    });
+    expect(matches).toEqual([]);
+  });
+
+  it("keeps a real entry whose name merely contains the word", () => {
+    const matches = parseLibraryMatches({
+      categories: [
+        { name: "Community wifi", softrUrl: "https://x.test/d" },
+        { name: "Community-building resources", softrUrl: "https://x.test/e" },
+      ],
+    });
+    expect(matches.map((m) => m.name)).toEqual([
+      "Community wifi",
+      "Community-building resources",
+    ]);
+  });
+});
