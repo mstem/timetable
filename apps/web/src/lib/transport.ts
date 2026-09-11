@@ -16,6 +16,10 @@ export type TransportAuth = {
    * Only ever forwarded alongside a token; the API re-verifies admin
    * rights on every request. */
   getViewAs(): Promise<string | undefined>;
+  /** Send GraphQL somewhere other than `env.graphqlUrl` — remote-dev-api
+   * points it at the hosted dev API (server) or at the route handler that
+   * holds the token (browser). REST is unaffected and stays local. */
+  graphqlUrl?: string;
 };
 
 export type Transport = {
@@ -51,7 +55,7 @@ export function createTransport(auth: TransportAuth): Transport {
     query: string,
     variables?: Record<string, unknown>,
   ): Promise<T> => {
-    const res = await fetch(env.graphqlUrl, {
+    const res = await fetch(auth.graphqlUrl ?? env.graphqlUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

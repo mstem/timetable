@@ -31,6 +31,32 @@ function extractToken(
   return cookies["__session"] ?? null;
 }
 
+/** local-dev-user: the seeded member named by DEV_LOCAL_USER, looked up by
+ * email on the local users table. Nothing is created — the email has to
+ * belong to a row `npm run db:seed` put there, so a typo reads as signed
+ * out rather than conjuring an account. */
+async function loadDevLocalUser(): Promise<SessionUser | null> {
+  const email = env.devLocalUser;
+  if (!email) return null;
+  const [user] = await db
+    .select({
+      id: users.id,
+      email: users.email,
+      name: users.name,
+      image: users.image,
+    })
+    .from(users)
+    .where(eq(users.email, email))
+    .limit(1);
+  if (!user) {
+    console.warn(
+      `[api] DEV_LOCAL_USER=${email} matches no seeded user — run npm run db:seed`,
+    );
+    return null;
+  }
+  return user;
+}
+
 async function loadLocalUser(id: string): Promise<SessionUser | null> {
   const [user] = await db
     .select({
@@ -128,9 +154,11 @@ export async function getUserFromRequest(
   authHeader?: string | null,
   cookieHeader?: string | null,
 ): Promise<SessionUser | null> {
-  if (!secretKey) return null;
   const token = extractToken(authHeader, cookieHeader);
-  if (!token) return null;
+  // local-dev-user: no token and no Clerk. Checked before the secret-key
+  // bail so a machine with no CLERK_SECRET_KEY at all still has a viewer.
+  if (!token) return loadDevLocalUser();
+  if (!secretKey) return null;
 
   const clerkUserId = await verifySessionToken(token);
   if (!clerkUserId) return null;

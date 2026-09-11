@@ -1,6 +1,6 @@
-import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
+import { serverAuth } from "@/lib/serverAuth";
 import { ProfilePanel } from "@/components/ProfilePanel";
 import { gqlFetch } from "@/lib/graphql";
 
@@ -20,7 +20,7 @@ const QUERY = `query {
  * account-only. Appearance lives in the sidebar foot and digests on the
  * notifications page (QA 2026-07-28). */
 export default async function ProfilePage() {
-  const { userId } = await auth();
+  const { userId } = await serverAuth();
   if (!userId) redirect("/sign-in");
 
   const data = await gqlFetch<Data>(QUERY);

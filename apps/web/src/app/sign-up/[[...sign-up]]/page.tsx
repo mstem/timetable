@@ -1,6 +1,6 @@
 import { SignUp } from "@clerk/nextjs";
 
-import { e2eTestMode } from "@/env";
+import { authDisabled } from "@/env";
 
 export default function SignUpPage() {
   return (
@@ -9,7 +9,7 @@ export default function SignUpPage() {
         <h1>Create account</h1>
         <p>Create an account to create and join forums.</p>
       </div>
-      {e2eTestMode ? null : (
+      {authDisabled ? null : (
         <SignUp
           path="/sign-up"
           routing="path"

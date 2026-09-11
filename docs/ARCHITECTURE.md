@@ -181,6 +181,8 @@ and the topic status in one place, and `topicCardProps` assembles the shared
 - digest rendering/sending
 - ICS generation
 - markdown rendering/sanitization
+- the Civic Tech Field Guide content matcher, cached (`library.ts`,
+  local-only behind `LIBRARY_RECOMMEND_URL`)
 - request logging
 - structured REST/Yoga error logging
 - store-backed rate limiting, with shared PostgreSQL buckets in hosted apps
@@ -248,6 +250,10 @@ Main queries include:
   availability wash — counts and per-elector rows charted on this topic's
   hearters — while everyone else gets only their own 🟢🟡🔴)
 - `myAvailabilityPattern`
+- `libraryMatches` (in-the-library: up to three Civic Tech Field Guide
+  entries matched against a published topic, for the comment the Topic
+  Queue's ↓ pre-composes. Null when `LIBRARY_RECOMMEND_URL` is unset,
+  which is every hosted environment)
 - `dashboard`
 - `myIcsToken`
 - `forumRouteByDomain`
@@ -320,6 +326,18 @@ data in PostgreSQL.
 4. API creates a local `user` row on first sign-in using the Clerk user id.
 5. Pending email invites are claimed by matching the user's email.
 6. Domain services load timetable memberships and enforce role permissions.
+
+The web app reaches Clerk through one seam, `lib/serverAuth.ts` (server
+components) plus the transport's `getToken` (API calls): `auth()` throws
+when `clerkMiddleware` never ran, and two modes deliberately don't run it.
+`E2E_TEST_MODE=1` renders anonymous shells for Playwright, and
+`DEV_LOCAL_USER` / `NEXT_PUBLIC_DEV_LOCAL_USER` (local-dev-user,
+2026-09-08) signs every request in as one seeded member so the app runs
+with no Clerk keys at all — the API resolves that member by email when a
+request carries no token. Both are authentication kill switches, so the
+API refuses to boot and the web build refuses to compile with either set
+in production. E2E mode outranks local-dev-user, since the smoke suite
+inherits `apps/web/.env.local` and asserts the anonymous shells.
 
 There are no Auth.js tables and no Clerk webhook is required for normal
 operation. A future `user.deleted` webhook could be added if hard deletion of

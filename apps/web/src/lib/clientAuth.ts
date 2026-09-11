@@ -1,3 +1,5 @@
+import { authDisabled } from "@/env";
+
 type ClerkGlobal = {
   loaded?: boolean;
   session?: { getToken: () => Promise<string | null> };
@@ -30,6 +32,9 @@ async function waitForClerk(
 /** Read the current Clerk session token in the browser (null when signed out). */
 export async function getClerkToken(): Promise<string | null> {
   if (typeof window === "undefined") return null;
+  // With Clerk off, window.Clerk never appears, so waitForClerk would burn
+  // its whole 5s timeout on every client request (local-dev-user, 2026-09-08).
+  if (authDisabled) return null;
   const clerk = await waitForClerk();
   if (!clerk?.session) return null;
   try {

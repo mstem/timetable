@@ -9,18 +9,28 @@
  * when strict-dynamic is present.
  */
 
-import { env } from "@/env";
+import { authDisabled, env } from "@/env";
+
+/** Hostname shape. A publishable key that isn't one (the `pk_test_xxx`
+ * placeholder in `.env.example`, say) decodes to arbitrary bytes, and
+ * putting those in the header threw `ERR_INVALID_CHAR` on every request —
+ * a 500 on every page whose cause named the CSP, not the key
+ * (2026-09-08). */
+const HOSTNAME = /^[a-z0-9.-]+$/i;
 
 /** The Clerk frontend-API origin is encoded in the publishable key
  * (pk_test_/pk_live_ + base64("<domain>$")) — decode it rather than
- * hardcoding a domain per environment. */
+ * hardcoding a domain per environment. Null when Clerk isn't running at
+ * all (local-dev-user, the Playwright shells): nothing will connect to it.
+ */
 export function clerkFrontendOrigin(): string | null {
+  if (authDisabled) return null;
   const key = env.clerkPublishableKey;
   const encoded = key.replace(/^pk_(test|live)_/, "");
   if (!encoded || encoded === key) return null;
   try {
     const domain = atob(encoded).replace(/\$$/, "");
-    return domain ? `https://${domain}` : null;
+    return domain && HOSTNAME.test(domain) ? `https://${domain}` : null;
   } catch {
     return null;
   }

@@ -35,6 +35,13 @@ const config = [
     ignores: [
       "src/env.ts",
       "src/lib/transport.ts",
+      // remote-dev-api (2026-09-08): both are transport, not call sites —
+      // the route handler forwards a GraphQL body to the hosted dev API
+      // with the personal token, and localGql is the one path that must
+      // stay pointed at the local API (in-the-library's field only exists
+      // there).
+      "src/app/api/remote-graphql/route.ts",
+      "src/lib/localGraphql.ts",
       "src/components/ImageUploadField.tsx",
       "src/proxy.ts",
     ],

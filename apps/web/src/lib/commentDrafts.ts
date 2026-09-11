@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 /**
  * comment-draft-store (Ed, 2026-08-21): half-written comments survive
@@ -15,6 +15,12 @@ import { useCallback, useState } from "react";
  * reload is still a clean slate.
  */
 const drafts = new Map<string, string>();
+
+/** Mounted composers, per key, so a write from outside one of them shows
+ * up in the box (`setDraft`). A Set per key rather than one global list:
+ * the queue page holds a dozen of these and a suggestion for one topic
+ * must not re-render the rest. */
+const watchers = new Map<string, Set<(value: string) => void>>();
 
 export const draftKey = {
   /** A new comment on a topic - one draft per visibility thread. */
@@ -38,11 +44,30 @@ export function hasDraft(key: string) {
   return drafts.has(key);
 }
 
+/** What is waiting under this key, or "". */
+export function getDraft(key: string) {
+  return drafts.get(key) ?? "";
+}
+
 /** Drop a draft from outside its composer — a parent row toggling its
  * editor shut is discarding the edit, and the composer unmounts before it
  * could clear up after itself. */
 export function clearDraft(key: string) {
   drafts.delete(key);
+}
+
+/**
+ * Put text in a draft from outside its composer, and show it there.
+ *
+ * in-the-library needs this: the pre-composed comment arrives from a fetch
+ * the composer never made, seconds after the box opened, and possibly
+ * before the box exists at all (a mounting composer reads the map, so that
+ * case needs no notification). Callers own the decision to overwrite —
+ * check `getDraft` first, since this replaces whatever was there.
+ */
+export function setDraft(key: string, text: string) {
+  drafts.set(key, text);
+  for (const notify of watchers.get(key) ?? []) notify(text);
 }
 
 /**
@@ -54,6 +79,18 @@ export function clearDraft(key: string) {
  */
 export function useDraft(key: string, initial = "") {
   const [value, setValue] = useState(() => drafts.get(key) ?? initial);
+
+  // Follow writes from outside this box (setDraft). The mount case is
+  // already covered by the initialiser above, which reads the map.
+  useEffect(() => {
+    const pool = watchers.get(key) ?? new Set<(v: string) => void>();
+    watchers.set(key, pool);
+    pool.add(setValue);
+    return () => {
+      pool.delete(setValue);
+      if (pool.size === 0) watchers.delete(key);
+    };
+  }, [key]);
 
   const set = useCallback(
     (next: string) => {

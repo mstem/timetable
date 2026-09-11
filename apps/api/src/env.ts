@@ -50,6 +50,12 @@ if (isProd) {
   }
 }
 
+if (isProd && process.env.DEV_LOCAL_USER) {
+  throw new Error(
+    "[api] DEV_LOCAL_USER signs every request in as one member and must never be set in production",
+  );
+}
+
 if (rateLimitBackend === "database" && !process.env.DATABASE_URL) {
   throw new Error(
     "[api] RATE_LIMIT_BACKEND=database requires DATABASE_URL so buckets are shared across API instances",
@@ -137,6 +143,30 @@ export const env = {
   get cronSecret(): string | null {
     return process.env.CRON_SECRET ?? null;
   },
+  /**
+   * local-dev-user (2026-09-08): the email of a seeded member every
+   * unauthenticated request acts as, so the app can be used locally with no
+   * Clerk keys at all (`NEXT_PUBLIC_DEV_LOCAL_USER` is the web half). A
+   * request that DOES carry a token or an API token is still authenticated
+   * normally; this only fills the gap where there would otherwise be no
+   * viewer.
+   *
+   * It is an authentication bypass, so production refuses to boot with it
+   * set (checked below) rather than trusting it to be absent.
+   */
+  devLocalUser: process.env.DEV_LOCAL_USER?.trim().toLowerCase() || null,
+  /**
+   * in-the-library: the Civic Tech Field Guide content matcher the Topic
+   * Queue's ↓ pre-composes a comment from (ctfg-guidefinder's public
+   * endpoint, https://curator.civictech.guide/api/recommend).
+   *
+   * UNSET = the feature is off and `libraryMatches` resolves to null, which
+   * is how it stays a local experiment: `.env.example` carries the URL and
+   * the hosted app specs deliberately don't. The endpoint's daily budget is
+   * 400 requests shared by every caller on the internet, so pointing a
+   * hosted forum at it is a decision, not a default.
+   */
+  libraryRecommendUrl: process.env.LIBRARY_RECOMMEND_URL?.trim() || null,
   graphqlMaxDepth: intEnv("GRAPHQL_MAX_DEPTH", 12),
   graphqlMaxCost: intEnv("GRAPHQL_MAX_COST", 500),
   uploadMaxImageBytes: intEnv("UPLOAD_MAX_IMAGE_BYTES", 5 * 1024 * 1024),

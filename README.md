@@ -53,7 +53,7 @@ Prerequisites:
 
 - Node.js 20 or newer
 - Docker, or another PostgreSQL 16 instance
-- Clerk application keys for authentication
+- Clerk application keys for authentication, or the no-Clerk path below
 
 ```bash
 npm install
@@ -82,6 +82,30 @@ one of them, run `npm run clerk:seed-dev-users` (against a Clerk
 code `424242` with any `+clerk_test` email. Seeding details, including how
 to map a sample person to a real Clerk account, are in
 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#github-actions).
+
+### Running with no Clerk keys
+
+Clerk is a paid third party, and the placeholder key in `.env.example`
+gives a 500 on every page rather than a sign-in screen. To use the app
+locally without it, name a seeded member in both env files:
+
+```bash
+# .env               (API)
+DEV_LOCAL_USER=host-eli+clerk_test@example.com
+# apps/web/.env.local (web)
+NEXT_PUBLIC_DEV_LOCAL_USER=host-eli+clerk_test@example.com
+```
+
+Every request then acts as that member and Clerk is never loaded: no
+sign-in, no session, and the account menu drops the two items only Clerk
+can serve. Change the email and restart both servers to become someone
+else — `admin-edwin+clerk_test@example.com` for the admin surfaces, any
+`elector-*` for a plain voter.
+
+It is an authentication bypass, so both halves refuse to run in
+production: the API throws at boot and the web build fails. That also
+means `npm run build` fails while it is switched on — comment the web line
+out to run the production build locally.
 
 ## Docs
 

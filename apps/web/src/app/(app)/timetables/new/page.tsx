@@ -1,12 +1,12 @@
-import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
+import { serverAuth } from "@/lib/serverAuth";
 import { CreateTimetableForm } from "@/components/CreateTimetableForm";
 
 /** The "make a new timetable" screen — reached from the topbar timetable
  * menu's last item, and the landing page for users with no timetables. */
 export default async function NewTimetablePage() {
-  const { userId } = await auth();
+  const { userId } = await serverAuth();
   if (!userId) redirect("/sign-in");
 
   return (

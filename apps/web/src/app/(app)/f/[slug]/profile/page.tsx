@@ -1,6 +1,6 @@
-import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
+import { serverAuth } from "@/lib/serverAuth";
 import { ProfilePanel } from "@/components/ProfilePanel";
 import { gqlFetch } from "@/lib/graphql";
 
@@ -28,7 +28,7 @@ export default async function TimetableProfilePage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const { userId } = await auth();
+  const { userId } = await serverAuth();
   if (!userId) redirect("/sign-in");
 
   const data = await gqlFetch<Data>(QUERY, { s: slug });

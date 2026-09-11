@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   push: vi.fn(),
   refresh: vi.fn(),
   clientGql: vi.fn(),
+  localGql: vi.fn(),
   toast: vi.fn(),
   toastError: vi.fn(),
 }));
@@ -22,6 +23,12 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/lib/clientGraphql", () => ({
   clientGql: (...args: unknown[]) => mocks.clientGql(...args),
+}));
+
+// in-the-library asks the LOCAL api (remote-dev-api points the shared
+// transport at hosted dev, which has no libraryMatches field).
+vi.mock("@/lib/localGraphql", () => ({
+  localGql: (...args: unknown[]) => mocks.localGql(...args),
 }));
 
 vi.mock("@/components/Toast", () => ({
@@ -44,6 +51,14 @@ vi.mock("next/link", () => ({
 }));
 
 import { QueueControls } from "@/components/QueueControls";
+import { clearDraft, draftKey, getDraft, setDraft } from "@/lib/commentDrafts";
+
+const PUBLIC_DRAFT = draftKey.comment("t1", "public");
+
+const MATCHES = [
+  { name: "Chat and messaging", url: "https://app.civictech.guide/c?r=1" },
+  { name: "Deliberation", url: "https://app.civictech.guide/c?r=2" },
+];
 
 /** The Topic Queue's arrow keys (queue-keys, 2026-09-07). Each arrow must
  * do exactly what its button does — and, just as important, stand down
@@ -69,7 +84,9 @@ function setup(props: Partial<Parameters<typeof QueueControls>[0]> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  clearDraft(PUBLIC_DRAFT);
   mocks.clientGql.mockResolvedValue({});
+  mocks.localGql.mockResolvedValue({});
   // jsdom has no layout, so it doesn't implement this.
   Element.prototype.scrollIntoView = vi.fn();
 });
@@ -149,6 +166,46 @@ describe("queue-keys", () => {
     fireEvent.keyDown(window, { key: "ArrowUp", altKey: true });
     expect(mocks.push).not.toHaveBeenCalled();
     expect(mocks.clientGql).not.toHaveBeenCalled();
+  });
+
+  it("↓ pre-composes the In the Library comment (in-the-library)", async () => {
+    mocks.localGql.mockResolvedValue({ libraryMatches: MATCHES });
+    setup();
+    fireEvent.keyDown(window, { key: "ArrowDown" });
+    await waitFor(() =>
+      expect(getDraft(PUBLIC_DRAFT)).toBe(
+        [
+          "Real-world examples from the library:",
+          "Chat and messaging: https://app.civictech.guide/c?r=1",
+          "Deliberation: https://app.civictech.guide/c?r=2",
+        ].join("\n"),
+      ),
+    );
+  });
+
+  it("↓ leaves a half-written comment alone", async () => {
+    mocks.localGql.mockResolvedValue({ libraryMatches: MATCHES });
+    setDraft(PUBLIC_DRAFT, "my own thought");
+    setup();
+    fireEvent.keyDown(window, { key: "ArrowDown" });
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByLabelText("Comment")),
+    );
+    expect(getDraft(PUBLIC_DRAFT)).toBe("my own thought");
+    expect(mocks.localGql).not.toHaveBeenCalled();
+  });
+
+  it("↓ writes nothing when the matcher is off or has no answer", async () => {
+    mocks.localGql.mockResolvedValue({ libraryMatches: null });
+    setup();
+    fireEvent.keyDown(window, { key: "ArrowDown" });
+    await waitFor(() =>
+      expect(mocks.localGql).toHaveBeenCalledWith(
+        expect.stringContaining("libraryMatches"),
+        { s: "spt", id: "t1" },
+      ),
+    );
+    expect(getDraft(PUBLIC_DRAFT)).toBe("");
   });
 
   it("drops the ❤️ hint from the legend without the gesture", () => {

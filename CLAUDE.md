@@ -62,6 +62,25 @@ do not unify the surfaces.**
 - Dev sign-in: seeded Clerk test users, email OTP code **424242**
   (`npm run clerk:seed-dev-users`; re-sign-ins hit a resend cooldown — wait for
   "Resend (n)", click it, then type the code)
+- **No Clerk keys? Use local-dev-user** (2026-09-08). Clerk is paid and not
+  every machine has development keys — the `pk_test_xxx` placeholder in
+  `.env.example` 500s EVERY page (`csp.ts` decodes the Clerk origin out of
+  the key, and junk bytes in the header throw `ERR_INVALID_CHAR`), which
+  had already blocked QA twice. Set `DEV_LOCAL_USER=<seeded member email>`
+  in `.env` **and** `NEXT_PUBLIC_DEV_LOCAL_USER=<same>` in
+  `apps/web/.env.local`: Clerk is then never loaded (proxy, provider,
+  sign-in pages, both token getters, the account menu's Clerk-only items)
+  and every tokenless request acts as that member, resolved by email in
+  `auth/clerk.ts`. Switch member = edit both + restart both servers.
+  `host-eli+clerk_test@example.com` is host+elector (the fullest queue),
+  `admin-edwin+clerk_test@example.com` the admin surfaces. Both halves are
+  auth kill switches guarded like `E2E_TEST_MODE`: the API throws at boot
+  in production and the web build refuses to compile — so **`npm run build`
+  fails while it is on**; comment out the web line to run the production
+  build. E2E mode outranks it (the Playwright suite reads the same
+  `.env.local` and asserts anonymous shells). Server components must call
+  `serverAuth()` from `@/lib/serverAuth`, never Clerk's `auth()` directly —
+  `auth()` throws with no middleware.
 
 Every PR must keep green (CI enforces this):
 `npm run build` · `npm run typecheck` · `npm run lint` · `npm run format:check`
@@ -316,6 +335,45 @@ Stable names for feature pieces, so instructions can reference them precisely.
   page doesn't scroll under the card, which is the one thing this costs.
   Covered by `QueueControls.test.tsx` — the web workspace's first jsdom
   component test.
+- **in-the-library** — the Topic Queue's ↓ pre-composes a comment
+  pointing at the Civic Tech Field Guide (2026-09-07): `libraryQueryText`
+  / `parseLibraryMatches` / `composeLibraryComment` in
+  `packages/shared/src/library.ts` (pure, unit-tested),
+  `findLibraryMatches` in `apps/api/src/library.ts` (the one request, with
+  a 24h cache and in-flight dedupe), the `libraryMatches` query in
+  `apps/api/src/graphql/library.ts`, and the ↓ wiring in `QueueControls`.
+  The matcher is ctfg-guidefinder's PUBLIC endpoint on a budget of **400
+  requests a day shared by every caller on the internet**, so the request
+  goes out from the API (one egress IP, one cache) matched on the topic
+  the SERVER loaded, never on client-sent text. **Local only:**
+  `LIBRARY_RECOMMEND_URL` unset ⇒ the query resolves null and nothing
+  happens; `.env.example` has the URL, the hosted specs deliberately
+  don't. The body is plain text with bare URLs (comments have no
+  markdown; `splitLinks` autolinks): one lead line, **"Real-world examples
+  from the library:"** (`LIBRARY_COMMENT_LEAD`), then one `Name: url` per
+  entry. It only ever writes an EMPTY draft —
+  empty at the press AND still empty when the matcher answers, so typing
+  your own comment wins the race — via [[comment-draft-store]]'s new
+  `setDraft`/`getDraft`, which notify per key so one suggestion doesn't
+  re-render the queue's other composers.
+- **remote-dev-api** — run the LOCAL web app against the hosted dev API
+  (2026-09-08): `NEXT_PUBLIC_REMOTE_API=1` + `DEV_API_URL` +
+  `DEV_API_TOKEN` (a `tpk_` personal token, `comments:write`) in
+  `apps/web/.env.local`. Topics on screen are dev's real ones and a
+  comment posts back there — **as the token's owner**, since scopes are a
+  ceiling and never a grant. Four constraints shape it: the hosted API
+  wants Clerk and this machine has none, so auth is a personal token; the
+  token must never reach the browser, so the client posts to the
+  same-origin `/api/remote-graphql` route handler which adds the header
+  (that also dodges CORS and keeps `connect-src 'self'` — a direct browser
+  call to dev is blocked twice over); personal tokens are **GraphQL-only**,
+  so REST stays local and uploads/invites are out of this mode; and
+  `libraryMatches` exists only locally, so [[in-the-library]]'s lookup
+  goes through `localGql` (`lib/localGraphql.ts`) — safe because
+  `db:seed` is deterministic and every hosted dev topic has the same id
+  and text locally (50/50 verified 2026-09-08). `TransportAuth` gained an
+  optional `graphqlUrl` for the per-adapter split. Guarded like the auth
+  switches: a production build with the flag set refuses to compile.
 - **page-topic-toc** — `PageTopicToc.tsx` (Ed, 2026-08-17): the little
   table of contents under the My Topics and ❤️/💙 Topics page titles —
   the People-page profile-card topic-list look (`person-topics` styles),
@@ -358,19 +416,6 @@ Stable names for feature pieces, so instructions can reference them precisely.
   (`docs/DEPLOYMENT.md`); paths need nothing. The settings field is
   "Vanity address"; the column and GraphQL arg keep the `customDomain`
   name.
-
-- **sent-back-notice** — how a host hears that an admin pressed
-  `BackToDraftingButton` (`AdminTopicActions.tsx`, #344) on their ready
-  draft (Ed, 2026-09-08). Both channels read the `topic.unready` activity
-  event the mutation already logged, excluding the host's own flips
-  (their ReadySwitch writes the same event): `listSentBackNotifications`
-  in `packages/core/src/notifications.ts` puts a "moved your topic back to
-  drafting" line in the notifications pane (and the unread badge), linking
-  to the My Topics card with the drafting tab open; `unreadyActivities`
-  in `digests.ts` rides the digest as the `unready` activity kind — a
-  switch-less admin override like `assignment`, "Sent back to drafting"
-  pill, counts as news, skipped once the topic is no longer a draft. No
-  reason travels with it: the drafting thread is the channel for that.
 
 - **feed-position-store** — `lib/feedPosition.ts` (Ed's "going back feels
   fragile", 2026-08-28): remembers, per feed view, how many pages the

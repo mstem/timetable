@@ -1,4 +1,3 @@
-import { auth } from "@clerk/nextjs/server";
 import { Flag, Heart } from "lucide-react";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
@@ -7,6 +6,7 @@ import { cache } from "react";
 
 import { isAdmin, isElector, isHost, type Role } from "@timetable/shared";
 
+import { serverAuth } from "@/lib/serverAuth";
 import { NavLink } from "@/components/NavLink";
 import { Sidebar } from "@/components/Sidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -325,7 +325,7 @@ export default async function TimetableLayout({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const { userId } = await auth();
+  const { userId } = await serverAuth();
   const isAuthed = Boolean(userId);
 
   const timetable = await loadTimetable(slug);

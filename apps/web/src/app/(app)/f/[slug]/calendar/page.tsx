@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
-import { auth } from "@clerk/nextjs/server";
 import {
   calendarConfirmPolicy,
   isAdmin,
@@ -11,6 +10,7 @@ import {
   type Role,
 } from "@timetable/shared";
 
+import { serverAuth } from "@/lib/serverAuth";
 import { env } from "@/env";
 import { AudienceFilter } from "@/components/AudienceFilter";
 import { CalendarTable } from "@/components/CalendarTable";
@@ -483,7 +483,7 @@ export default async function CalendarPage({
 }) {
   const { slug } = await params;
   const { audience, location, show, past: pastParam } = await searchParams;
-  const { userId } = await auth();
+  const { userId } = await serverAuth();
   const past = pastParam === "1";
 
   const data = await gqlFetch<Data>(userId ? QUERY_AUTHED : QUERY, {

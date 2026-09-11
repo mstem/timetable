@@ -1,6 +1,6 @@
-import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
+import { serverAuth } from "@/lib/serverAuth";
 import { gqlFetch } from "@/lib/graphql";
 
 /**
@@ -10,7 +10,7 @@ import { gqlFetch } from "@/lib/graphql";
  * to the new-timetable screen.
  */
 export default async function TimetablesLandingPage() {
-  const { userId } = await auth();
+  const { userId } = await serverAuth();
   if (!userId) redirect("/sign-in");
 
   const data = await gqlFetch<{ myLastVisitedTimetableSlug: string | null }>(

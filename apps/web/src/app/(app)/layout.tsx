@@ -1,4 +1,3 @@
-import { auth, currentUser } from "@clerk/nextjs/server";
 import Link from "next/link";
 import { Suspense } from "react";
 
@@ -10,6 +9,7 @@ import { TopbarHeightSync } from "@/components/TopbarHeightSync";
 import { TopbarRoles } from "@/components/TopbarRoles";
 import { ToastProvider } from "@/components/Toast";
 import { getMyTimetables } from "@/lib/myTimetables";
+import { serverAccountEmail, serverAuth } from "@/lib/serverAuth";
 import { parseTimetableSettings } from "@/lib/timetableSettings";
 
 export default async function AppLayout({
@@ -19,9 +19,8 @@ export default async function AppLayout({
 }) {
   // No redirect here: public timetables are readable by anonymous visitors.
   // Pages that require a session enforce it themselves.
-  const { userId } = await auth();
-  const user = userId ? await currentUser() : null;
-  const email = user?.primaryEmailAddress?.emailAddress ?? null;
+  const { userId } = await serverAuth();
+  const email = userId ? await serverAccountEmail() : null;
 
   let brandItems: BrandItem[] = [];
   if (userId) {

@@ -5,7 +5,7 @@ import { headers } from "next/headers";
 import "./tokens.css";
 import "./globals.css";
 
-import { e2eTestMode, env } from "@/env";
+import { authDisabled, env } from "@/env";
 import { emojiFavicon } from "@/lib/favicon";
 
 export const metadata: Metadata = {
@@ -78,7 +78,7 @@ export default async function RootLayout({
     </html>
   );
 
-  if (e2eTestMode) return content;
+  if (authDisabled) return content;
 
   // The nonce rides into Clerk's own injected <script> tags: under the
   // CSP's strict-dynamic, host allowlisting is off, so without it Clerk's

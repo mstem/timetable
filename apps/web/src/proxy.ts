@@ -7,7 +7,7 @@ import {
 
 import { matchVanityRoute, type VanityRoute } from "@timetable/shared";
 
-import { e2eTestMode, env } from "@/env";
+import { authDisabled, env } from "@/env";
 import { canonicalHosts, redirectTargetHost } from "@/lib/canonicalHost";
 import { buildCsp, mintNonce } from "@/lib/csp";
 
@@ -237,9 +237,10 @@ export default async function proxy(
   const vanity = await vanityRedirect(request);
   if (vanity) return vanity;
 
-  // Playwright smoke tests render anonymous shell routes without Clerk's
-  // development-browser handshake or real Clerk credentials.
-  if (e2eTestMode) {
+  // No Clerk to hand off to: the Playwright shells, or local-dev-user on a
+  // machine with no Clerk credentials at all. Either way nothing here needs
+  // Clerk's development-browser handshake.
+  if (authDisabled) {
     return routeRequest(request);
   }
   return clerkProxy(request, event);

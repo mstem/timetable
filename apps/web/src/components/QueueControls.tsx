@@ -8,6 +8,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useToast } from "@/components/Toast";
 import { clientGql } from "@/lib/clientGraphql";
 import { draftKey, getDraft, setDraft } from "@/lib/commentDrafts";
+import { localGql } from "@/lib/localGraphql";
 import {
   isTypingTarget,
   queueKeyAction,
@@ -73,15 +74,22 @@ async function suggestLibraryComment(slug: string, topicId: string) {
   const key = draftKey.comment(topicId, "public");
   if (getDraft(key)) return;
   try {
-    const data = await clientGql<{
+    // localGql, not clientGql: `libraryMatches` exists only on the local
+    // API, so under remote-dev-api the shared transport would ask the
+    // hosted schema for a field it doesn't have.
+    const data = await localGql<{
       libraryMatches: { name: string; url: string }[] | null;
     }>(LIBRARY, { s: slug, id: topicId });
     const body = composeLibraryComment(data.libraryMatches ?? []);
     if (!body || getDraft(key)) return;
     setDraft(key, body);
-  } catch {
+  } catch (err) {
     // The library is a nicety on top of commenting; an empty box is the
-    // fallback, and a toast here would interrupt the round.
+    // fallback, and a toast here would interrupt the round. It gets a
+    // console line because the silence cost an afternoon (2026-09-08): a
+    // CORS block on this fetch is indistinguishable from "no matches", and
+    // ↓ still focused the box, so the feature read as simply not wired up.
+    console.warn("[library] no suggestion for this topic", err);
   }
 }
 

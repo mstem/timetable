@@ -1,6 +1,6 @@
 import { SignIn } from "@clerk/nextjs";
 
-import { e2eTestMode } from "@/env";
+import { authDisabled } from "@/env";
 
 export default function SignInPage() {
   return (
@@ -9,7 +9,7 @@ export default function SignInPage() {
         <h1>Sign in</h1>
         <p>Continue with your account to access your forums.</p>
       </div>
-      {e2eTestMode ? null : (
+      {authDisabled ? null : (
         <SignIn
           path="/sign-in"
           routing="path"

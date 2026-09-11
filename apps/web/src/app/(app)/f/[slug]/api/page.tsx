@@ -1,5 +1,4 @@
-import { auth } from "@clerk/nextjs/server";
-
+import { serverAuth } from "@/lib/serverAuth";
 import { ApiTokenPanel, type ApiTokenRow } from "@/components/ApiTokenPanel";
 import { ExportDownloadButton } from "@/components/ExportDownloadButton";
 import { env } from "@/env";
@@ -19,7 +18,7 @@ export default async function ApiPage({
   // docs without the token panel's data. Don't fire the query for them
   // (myApiTokens would only refuse), and don't swallow real errors for
   // signed-in members into a bogus "sign in" prompt.
-  const { userId } = await auth();
+  const { userId } = await serverAuth();
   const myApiTokens = userId
     ? (await gqlFetch<{ myApiTokens: ApiTokenRow[] }>(TOKENS_QUERY)).myApiTokens
     : null;
